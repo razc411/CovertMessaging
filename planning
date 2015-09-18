@@ -1,0 +1,18 @@
+Covert Messaging Planning
+
+UDP Packet Size messaging
+65,507 bytes = max messaging size
+28 bytes for ip and other header info
+4 numbers
+4th - subtract sum from 1000 if higher than 5
+    - take sum if 5 or lower
+3rd -> 1st - ascii character
+Flip byte to get actual message
+encryption key in data?
+
+source port can be used
+
+steps
+- switches
+  - listen/send modes
+  - specifiy source ip and port

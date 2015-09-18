@@ -1,0 +1,6 @@
+Report Analyzation
+
+- no encryption
+- requires an actual tcp connection
+- too easily spotted
+- no dummy data within tcp packets, detectable pattern of empty data sets
