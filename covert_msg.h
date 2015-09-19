@@ -5,6 +5,13 @@
 #include<errno.h> //For errno - the error number
 #include<netinet/tcp.h>   //Provides declarations for tcp header
 #include<netinet/ip.h>    //Provides declarations for ip header
+#include<curses.h>
+
+#DEFINE FILE_MSG_CMD "fmsg"
+#DEFINE MSG_CMD "cmsg"
+#DEFINE FILE_FLAG 1
+#DEFINE MSG_FLAG 2
+
  
 /* 
     96 bit (12 bytes) pseudo header needed for tcp header checksum calculation 

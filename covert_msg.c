@@ -12,68 +12,74 @@
 // sndm message to send - completetion message once done
 // recieve file or message - say processing incoming data, save to file (todo message v file mode)
 
+char[16] communicator_addr;
+memset(communicator_addr, 0, strlen(communicator_addr));
+
 int main (int argc, char ** argv)
 {
-  //read switches, set communicator ip
-  //set listen socket
-  //loop
-  // listen to terminal input, if message inputted (file or typed) connect to communicator and send data
-  // listen to socket, if connect from communicator recieved intiate session and save data
+  initscr();
 
-  char[16] communicator_addr;
   struct sockaddr_in comm_addr;
   int listener_sock = create_listener();
-  int csock, commlen;
+  int csock = 0, commlen = 0;
   
   if(argc != 2){
       printf("requires a client ip argument in the form cmsg -cip '111.111.111.11'");
       exit(0);
   }
-
   else{
       communicator_addr = argv[1];
   }
-
-  while(1){  
-    csock = accept4(listener_sock, (struct sockaddr *)&comm_addr, &commlen, SOCK_NONBLOCK);
-    if(csock == (EAGAIN || EWOULDBLOCK)){
-      continue;
-    }
-  }
   
-  int s = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
-     
-  if(s == -1)
-    {
-      //socket creation failed, may be because of non-root privileges
-      perror("Failed to create socket");
-      exit(1);
+  nodelay(stdscr, TRUE);
+  
+  while(1){  
+    if(kbhit()){
+      handle_command();
     }
-    
-  struct pseudo_packet pseudogram =  craft_packet("192.168.0.32", "1.2.4.3", 0);
-  //IP_HDRINCL to tell the kernel that headers are included in the packet
-  int one = 1;
-  const int *val = &one;
-     
-  if (setsockopt (s, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0)
-    {
-      perror("Error setting IP_HDRINCL");
+
+    csock = accept4(listener_sock, (struct sockaddr *)&comm_addr, &commlen, SOCK_NONBLOCK);
+    if(csock > 0){    
+      //process connection
+      csock = 0;
+    }
+    else if(errno == (EAGAIN || EWOULDBLOCK)) {
+	csock = 0;
+    }
+    else {
+      perror("Failure in accept4()");
       exit(0);
     }
-     
-  while (1)
-    {
-      if (sendto (s, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0)
-        {
-	  perror("sendto failed");
-        }
-      else
-        {
-	  printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
-        }
+  }
+}
+
+int kbhit(void)
+{
+    int ch = getch();
+
+    if (ch != ERR) {
+        ungetch(ch);
+        return 1;
+    } else {
+        return 0;
     }
-     
-  return 0;
+}
+
+void handle_command()
+{
+  char[10] cmd, char[1000] csmg;
+  scanf(%s%s, cmd, cmsg);
+  if(strcmp(cmd, FILE_MSG_CMD)){
+    intiate_session(FILE_FLAG, cmsg);
+    printf("Sending file %s sneakily...", cmsg);
+  }
+  else if(strcmp(cmd, MSG_CMD) == 0){
+    intiate_session(MSG_FLAG, cmsg);
+    printf("Sending message %s sneakily...", cmsg);
+  }
+  else{
+    printf("%s : is not a valid command, please use cmsg or fmsg", cmd);
+  }
 }
 
 int create_listener()
@@ -116,15 +122,36 @@ int post_covert_http()
   //loop, for each ack send new fragment of data in http post
 }
 
-int intiate_session()
+int intiate_session(int mode, char * message)
 {
-  //connect to server
-  //send crafted syn
-  //wait for synack
-  //send ack
-  //wait for message
-  //recieve packet and add to buffer
-  //finish buffer and save file
+  int s = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
+     
+  if(s == -1){
+      //socket creation failed, may be because of non-root privileges
+      perror("Failed to create socket");
+      exit(1);
+  }
+    
+  struct pseudo_packet pseudogram =  craft_packet(communicator_addr, "1.2.4.3", message);
+
+  int one = 1;
+  const int *val = &one;
+     
+  if (setsockopt (s, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0){
+      perror("Error setting IP_HDRINCL");
+      exit(0);
+  }
+     
+  while (1){
+      if (sendto (s, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0){
+	  perror("sendto failed");
+      }
+      else{
+	  printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
+      }
+  }
+     
+  return 0;
 }
 
 int intiate_session_server()
