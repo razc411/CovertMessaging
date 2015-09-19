@@ -1,18 +1,42 @@
-Covert Messaging Planning
+int post_convert_http()
+{
+  //loop, for each ack send new fragment of data in http post
+}
 
-UDP Packet Size messaging
-65,507 bytes = max messaging size
-28 bytes for ip and other header info
-4 numbers
-4th - subtract sum from 1000 if higher than 5
-    - take sum if 5 or lower
-3rd -> 1st - ascii character
-Flip byte to get actual message
-encryption key in data?
+int intiate_session()
+{
+  //connect to server
+  //send crafted syn
+  //wait for synack
+  //send ack
+  //wait for message
+  //recieve packet and add to buffer
+  //finish buffer and save file
+}
 
-source port can be used
+int intiate_session_server()
+{
+  //open socket for listening
+  //crafted syn recieved, begin session
+  //send synack
+  //wait for ack,
+  //send message
+  //for each message part, send different http data, send part in etag
+  //once complete, wait for more connections
+}
 
-steps
-- switches
-  - listen/send modes
-  - specifiy source ip and port
+
+int main (void)
+{
+  //read switches, set communicator ip
+  //set listen socket
+  //loop
+  // listen to terminal input, if message inputted (file or typed) connect to communicator and send data
+  // listen to socket, if connect from communicator recieved intiate session and save data
+
+//switches
+// eg -cip 192.168.0.1
+//in process loop
+// sndf filename - completetion message once done
+// sndm message to send - completetion message once done
+// recieve file or message - say processing incoming data, save to file (todo message v file mode)
