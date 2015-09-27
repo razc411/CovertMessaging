@@ -1,175 +1,256 @@
 /*
-  Covert Messaging through TCP HTTP
+  Covert Messaging through TCP
   By Ramzi Chennafi
+  covert_msg.c
+  
+  Functions:
+
+    int process_packet(unsigned char * buffer, int data_size, char * listener);
+    void recieve_message(char * listener);
+    void send_message(char * address, char * data);
+    char * grab_random_addr(char ** ip_listing, int size);
+    struct pseudo_packet craft_packet(char * source, char * destination, char msg);
+
+  Contains main code bodies for the covert messaging program.
+
+  Sends data between two points covertly by hiding it within the source port of SYN packets using raw socekts while hiding from view by
+  randomizing the source address for the SYNs.
 */
 
 #include "covert_msg.h"
 
-//switches
-// eg -cip 192.168.0.1
-//in process loop
-// sndf filename - completetion message once done
-// sndm message to send - completetion message once done
-// recieve file or message - say processing incoming data, save to file (todo message v file mode)
-
-char[16] communicator_addr;
-memset(communicator_addr, 0, strlen(communicator_addr));
-
+/*
+  Interface:
+     int main(int argc, char ** argv)
+  Arguments:
+     int argc - number of arguments
+     char ** argv - arguments
+  Returns:
+     int, 0 on program end
+  
+  About:
+     The main body of argument. Either takes the program into sender or reciever mode.
+*/
 int main (int argc, char ** argv)
 {
-  initscr();
-
   struct sockaddr_in comm_addr;
   int listener_sock = create_listener();
   int csock = 0, commlen = 0;
   
   if(argc != 2){
-      printf("requires a client ip argument in the form cmsg -cip '111.111.111.11'");
+      printf("Requires either a send or listen command in the form\n -listen '192.19.1.1.'\n or \n -send '192.19.1.1 'message'");
       exit(0);
   }
-  else{
-      communicator_addr = argv[1];
-  }
   
-  nodelay(stdscr, TRUE);
-  
-  while(1){  
-    if(kbhit()){
-      handle_command();
-    }
-
-    csock = accept4(listener_sock, (struct sockaddr *)&comm_addr, &commlen, SOCK_NONBLOCK);
-    if(csock > 0){    
-      //process connection
-      csock = 0;
-    }
-    else if(errno == (EAGAIN || EWOULDBLOCK)) {
-	csock = 0;
-    }
-    else {
-      perror("Failure in accept4()");
-      exit(0);
-    }
+  if (strcmp(argv[1], "listen")){
+    recieve_message(argv[2]);
   }
-}
-
-int kbhit(void)
-{
-    int ch = getch();
-
-    if (ch != ERR) {
-        ungetch(ch);
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
-void handle_command()
-{
-  char[10] cmd, char[1000] csmg;
-  scanf(%s%s, cmd, cmsg);
-  if(strcmp(cmd, FILE_MSG_CMD)){
-    intiate_session(FILE_FLAG, cmsg);
-    printf("Sending file %s sneakily...", cmsg);
-  }
-  else if(strcmp(cmd, MSG_CMD) == 0){
-    intiate_session(MSG_FLAG, cmsg);
-    printf("Sending message %s sneakily...", cmsg);
+  else if(strcmp(argv[1], "send")){
+    send_message(argv[2], argv[3]);
   }
   else{
-    printf("%s : is not a valid command, please use cmsg or fmsg", cmd);
+    printf("Requires either a send or listen command in the form\n -listen\n or \n -send");
   }
+  
+  return 0;
 }
 
-int create_listener()
+/*
+  Interface:
+    void recieve_message(char * listener) 
+  Arguments;
+    char * listener - the address of the machine
+  Returns:
+    Nothing, void
+   
+  About:
+    Sits in a loop waiting for incoming data from the sender. Returns when the message has been completely
+    sent.
+*/ 
+void recieve_message(char * listener) 
 {
-   char buffer[256];
-   struct sockaddr_in serv_addr, cli_addr;
-   int  n, sockfd;
+   int serv_size , data_size, sockfd, n;
+   struct sockaddr serv_addr;
+   unsigned char *buffer = (unsigned char *) malloc(BUFFER_SIZE);
    
-   /* First call to socket() function */
-   sockfd = socket(AF_INET, SOCK_STREAM, 0);
+   sockfd = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
    
-   if (sockfd < 0)
-      {
-      perror("ERROR opening socket");
-      exit(1);
-      }
+   if (sockfd < 0){
+     perror("ERROR opening socket");
+     exit(1);
+   }
    
-   /* Initialize socket structure */
-   bzero((char *) &serv_addr, sizeof(serv_addr));
-   portno = 80;
-   
-   serv_addr.sin_family = AF_INET;
-   serv_addr.sin_addr.s_addr = INADDR_ANY;
-   serv_addr.sin_port = htons(portno);
-   
-   /* Now bind the host address using bind() call.*/
-   if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
-      {
-      perror("ERROR on binding");
-      exit(1);
-      }
-
-   listen(sockfd,5);
-   
-   return sockfd;
-}
-
-int post_covert_http()
-{
-  //loop, for each ack send new fragment of data in http post
-}
-
-int intiate_session(int mode, char * message)
-{
-  int s = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
+   while(1){
      
-  if(s == -1){
-      //socket creation failed, may be because of non-root privileges
+     serv_size = sizeof(serv_addr);
+     data_size = recvfrom(sockfd, buffer , BUFFER_SIZE, 0, &saddr, (socklen_t*)&saddr_size);
+     
+     if(data_size < 0){
+       printf("recv , failed to get packets\n");
+       exit(2);
+     }
+     
+     if(!process_packet(buffer, data_size, listener))
+       break;
+   }
+   
+   printf("Message recieved from %s and completed.", listener);
+   close(sockfd);
+}
+/*
+  Interface:
+    int process_packet(unsigned char * buffer, int data_size, char * listener)
+  Arguments:
+    unsigned char * buffer - the buffer containing the packet data
+    int data_size - the size of the buffer
+    char * listener - the ip of the host
+  Returns:
+    int, returns 0 when the last packet has been found and 1 when it hasn't.
+
+  About:
+    Processes incoming packets and retrieves each piece of data from the packets
+    source port until the termination EOT packet is found.
+*/
+int process_packet(unsigned char * buffer, int data_size, char * listener)
+{
+  char msgbit;
+  FILE *fp;
+  fp = fopen("dump", "w");
+  if(!fp){
+    perror("Failed to open file");
+    exit(1);
+  }
+  
+  struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+  struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
+  char source_addr[IP_LEN], dest_addr[IP_LEN];
+ 
+  snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
+  snprintf(dest_addr, IP_LEN, "%pI4", &ip_header->daddr);
+
+  if(iph->protocol == TCP && check_list(source_addr) && strcmp(dest_addr, listener) == 0 ){
+    
+    msgbit = tcph->source;
+
+    if(tcph->source == EOT){
+      return 0;
+      close(fp);
+    }
+    
+    fprintf(fp,"%c", msgbit);
+  }
+
+  return 1;
+}
+/*
+  Interface:
+    void send_message(char * address, char * data)
+  Arguments:
+    char * address - the address to send the message to
+    char * data - the filename to send
+  Returns
+    Nothing, void
+
+  About:
+    Sends a message a character at a time by hiding it in the source port of the tcp header.
+    Sends SYN floods from a list of ips in random order. Also reads in the list of IPs to be used
+    as false source ips.
+*/
+void send_message(char * address, char * data)
+{    
+  FILE *fp, *data_file;
+  int n = 1, count = 1;
+  const int *val = &n;
+  char * line = NULL;
+  size_t len = 0, read;
+  char ch;
+
+  fp = fopen("ip_listing.txt", "r");
+  if(!fp){
+    perror("Failure to open listings");
+    exit(1);
+  }
+
+  data_file = fopen(data, "r");
+  if(!data_file){
+    perror("Failure to open data file.");
+    exit(1);
+  }
+  
+  getline(&line, &len, fp);
+  int size = atoi(line);
+  char ip_listing[size][IP_LEN];
+  
+  while ((read = getline(&line, &len, fp)) != -1){
+     ip_listing[count++] == line;
+  }
+  
+  int sockfd = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
+     
+  if(sockfd == -1){
       perror("Failed to create socket");
       exit(1);
   }
-    
-  struct pseudo_packet pseudogram =  craft_packet(communicator_addr, "1.2.4.3", message);
 
-  int one = 1;
-  const int *val = &one;
-     
-  if (setsockopt (s, IPPROTO_IP, IP_HDRINCL, val, sizeof (one)) < 0){
+  if (setsockopt (sockfd, IPPROTO_IP, IP_HDRINCL, val, sizeof (n)) < 0){
       perror("Error setting IP_HDRINCL");
       exit(0);
   }
      
-  while (1){
-      if (sendto (s, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0){
-	  perror("sendto failed");
-      }
-      else{
-	  printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
-      }
+  while ((ch=fgetc(data_file)) !=EOF){
+    struct pseudo_packet pseudogram =  craft_packet(address, grab_random_addr(ip_listing, size), ch);
+    
+    if (sendto (sockfd, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0){
+      perror("sendto failed");
+    }
+    else{
+      printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
+    }
+    
+    usleep(10000);
   }
      
   return 0;
 }
 
-int intiate_session_server()
+/*
+  Interface 
+    char * grab_random_addr(char ** ip_listing, int size)
+  Arguments:
+    char ** ip_listing - the list of ips to choose
+    int size - the size of the ip list
+  Returns:
+    char *, the IP that was chosen.
+
+  About:
+    Grabs a random ip address from the IP listing array and returns it.
+*/
+char * grab_random_addr(char ** ip_listing, int size)
 {
-  //open socket for listening
-  //crafted syn recieved, begin session
-  //send synack
-  //wait for ack,
-  //send message
-  //for each message part, send different http data, send part in etag
-  //once complete, wait for more connections
+  int n;
+  time_t t;
+  srand((unsigned) time(&t));
+  
+  return ip_listing[rand() % size];
 }
- 
-struct pseudo_packet craft_packet(char * source, char * destination, char * message)
+
+/*
+  Interface:
+    struct pseudo_packet craft_packet(char * source, char * destination, char msg)
+  Arguments:
+    char * source - the source to send packets from
+    char * destination - the destination to send the packet to
+    char msg - the character to insert into the source port of the tcp header
+  Returns:
+    struct pseudo_packet, a packet created for sending raw
+
+  About:
+    Crafts a false syn packet from an address to a destination to with a character
+    from the message encoded in the source port.
+*/
+struct pseudo_packet craft_packet(char * source, char * destination, char msg)
 {
   char datagram[4096] , source_ip[32] , *data , *pseudogram;
-     
-  memset (datagram, 0, 4096);
      
   struct iphdr *iph = (struct iphdr *) datagram;
   struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct ip));
@@ -177,8 +258,8 @@ struct pseudo_packet craft_packet(char * source, char * destination, char * mess
   struct pseudo_header psh;
      
   data = datagram + sizeof(struct iphdr) + sizeof(struct tcphdr);
-  strcpy(data , "ABCDEFGHIJKLMNOPQRSTUVWXYZ");
-     
+  strcpy(data, "");
+
   strcpy(source_ip , source);
   sin.sin_family = AF_INET;
   sin.sin_port = htons(80);
@@ -188,17 +269,22 @@ struct pseudo_packet craft_packet(char * source, char * destination, char * mess
   iph->version = 4;
   iph->tos = 0;
   iph->tot_len = sizeof (struct iphdr) + sizeof (struct tcphdr) + strlen(data);
-  iph->id = htonl (54321); //Id of this packet
+  iph->id = 0; 
   iph->frag_off = 0;
   iph->ttl = 255;
   iph->protocol = IPPROTO_TCP;
-  iph->check = 0;      //Set to 0 before calculating checksum
-  iph->saddr = inet_addr ( source_ip );    //Spoof the source ip address
+  iph->check = 0;     
+  iph->saddr = inet_addr (source);    
   iph->daddr = sin.sin_addr.s_addr;
      
   iph->check = csum ((unsigned short *) datagram, iph->tot_len);
-     
-  tcph->source = htons (1234);
+  
+  char temp[3];
+  temp[0] = *message
+  temp[1] = *message + 1;
+  temp[2] = *message + 2;
+  
+  tcph->source = msg;
   tcph->dest = htons (80);
   tcph->seq = 0;
   tcph->ack_seq = 0;
@@ -210,10 +296,10 @@ struct pseudo_packet craft_packet(char * source, char * destination, char * mess
   tcph->ack=0;
   tcph->urg=0;
   tcph->window = htons (5840); /* maximum allowed window size */
-  tcph->check = 0; //leave checksum 0 now, filled later by pseudo header
+  tcph->check = 0; 
   tcph->urg_ptr = 0;
      
-  psh.source_address = inet_addr( source_ip );
+  psh.source_address = inet_addr(source);
   psh.dest_address = sin.sin_addr.s_addr;
   psh.placeholder = 0;
   psh.protocol = IPPROTO_TCP;

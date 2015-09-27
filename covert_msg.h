@@ -5,14 +5,13 @@
 #include<errno.h> //For errno - the error number
 #include<netinet/tcp.h>   //Provides declarations for tcp header
 #include<netinet/ip.h>    //Provides declarations for ip header
-#include<curses.h>
+#include<unistd.h>
+#DEFINE BUFFER_SIZE 65536
+#DEFINE TCP 6
+#DEFINE IP_LEN 16
+#DEFINE DATA_LEN 16
+#DEFINE EOT 4
 
-#DEFINE FILE_MSG_CMD "fmsg"
-#DEFINE MSG_CMD "cmsg"
-#DEFINE FILE_FLAG 1
-#DEFINE MSG_FLAG 2
-
- 
 /* 
     96 bit (12 bytes) pseudo header needed for tcp header checksum calculation 
 */
@@ -32,7 +31,11 @@ struct pseudo_packet
   struct sockaddr_in * sockaddr_in;
 };
 
-struct pseudo_packet craft_packet(char * source, char * destination, char * message);
+int process_packet(unsigned char * buffer, int data_size, char * listener);
+void recieve_message(char * listener);
+void send_message(char * address, char * data);
+char * grab_random_addr(char ** ip_listing, int size);
+struct pseudo_packet craft_packet(char * source, char * destination, char msg);
 
 unsigned short csum(unsigned short *ptr,int nbytes) 
 {
