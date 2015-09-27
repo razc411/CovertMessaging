@@ -36,6 +36,7 @@ struct pseudo_packet
   struct sockaddr_in * sockaddr_in;
 };
 
+int check_list(char * source, char ** ip_listing, int list_size);
 int process_packet(unsigned char * buffer, int data_size, char * listener);
 void recieve_message(char * listener);
 void send_message(char * address, char * data);

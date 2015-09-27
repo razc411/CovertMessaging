@@ -32,11 +32,7 @@
      The main body of argument. Either takes the program into sender or reciever mode.
 */
 int main (int argc, char ** argv)
-{
-  struct sockaddr_in comm_addr;
-  int listener_sock = create_listener();
-  int csock = 0, commlen = 0;
-  
+{ 
   if(argc != 2){
       printf("Requires either a send or listen command in the form\n -listen '192.19.1.1.'\n or \n -send '192.19.1.1 'message'");
       exit(0);
@@ -121,6 +117,20 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
     exit(1);
   }
   
+  fp = fopen("ip_listing.txt", "r");
+  if(!fp){
+    perror("Failure to open listings");
+    exit(1);
+  }
+  
+  getline(&line, &len, fp);
+  int size = atoi(line);
+  char ip_listing[size][IP_LEN];
+  
+  while ((read = getline(&line, &len, fp)) != -1){
+     ip_listing[count++] == line;
+  }
+
   struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
   struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
   char source_addr[IP_LEN], dest_addr[IP_LEN];
@@ -128,7 +138,7 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
   snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
   snprintf(dest_addr, IP_LEN, "%pI4", &iph->daddr);
 
-  if(iph->protocol == TCP && check_list(source_addr) && strcmp(dest_addr, listener) == 0 ){
+  if(iph->protocol == TCP && check_list(source_addr, ip_listing, size) && strcmp(dest_addr, listener) == 0 ){
     
     msgbit = tcph->source;
 
@@ -142,10 +152,28 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
 
   return 1;
 }
+/*
+  Interface:
+    int check_list(char * source, char ** ip_listing, int list_size)
+  Arguments:
+    char * source - the source ip to check against
+    char ** ip_listing - the list of valid ips 
+    int list_size - the size of ip_listing
+  Returns:
+    int, 1 if the ip is in the list, 0 if it is not
 
-int check_list(char * source)
+  About:
+    Checks if the source ip of the packet matches one on the list and returns the 
+    corresponding int.
+*/
+int check_list(char * source, char ** ip_listing, int list_size)
 {
-    
+  for(int i = 0; i < list_size; i++){
+    if(strcmp(ip_listing[i], source) == 0)
+      return 1;
+  }
+
+  return 0;
 }
 /*
   Interface:
