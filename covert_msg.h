@@ -6,11 +6,16 @@
 #include<netinet/tcp.h>   //Provides declarations for tcp header
 #include<netinet/ip.h>    //Provides declarations for ip header
 #include<unistd.h>
-#DEFINE BUFFER_SIZE 65536
-#DEFINE TCP 6
-#DEFINE IP_LEN 16
-#DEFINE DATA_LEN 16
-#DEFINE EOT 4
+#include<netdb.h>
+#include<netinet/tcp.h>
+#include<netinet/ip.h>
+#include<net/ethernet.h>
+
+#define BUFFER_SIZE 65536
+#define TCP 6
+#define IP_LEN 16
+#define DATA_LEN 16
+#define EOT 4
 
 /* 
     96 bit (12 bytes) pseudo header needed for tcp header checksum calculation 

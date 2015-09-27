@@ -69,7 +69,7 @@ int main (int argc, char ** argv)
 */ 
 void recieve_message(char * listener) 
 {
-   int serv_size , data_size, sockfd, n;
+    int serv_size , data_size, sockfd;
    struct sockaddr serv_addr;
    unsigned char *buffer = (unsigned char *) malloc(BUFFER_SIZE);
    
@@ -83,7 +83,7 @@ void recieve_message(char * listener)
    while(1){
      
      serv_size = sizeof(serv_addr);
-     data_size = recvfrom(sockfd, buffer , BUFFER_SIZE, 0, &saddr, (socklen_t*)&saddr_size);
+     data_size = recvfrom(sockfd, buffer , BUFFER_SIZE, 0, &serv_addr, (socklen_t*)&serv_size);
      
      if(data_size < 0){
        printf("recv , failed to get packets\n");
@@ -126,7 +126,7 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
   char source_addr[IP_LEN], dest_addr[IP_LEN];
  
   snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
-  snprintf(dest_addr, IP_LEN, "%pI4", &ip_header->daddr);
+  snprintf(dest_addr, IP_LEN, "%pI4", &iph->daddr);
 
   if(iph->protocol == TCP && check_list(source_addr) && strcmp(dest_addr, listener) == 0 ){
     
@@ -141,6 +141,11 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
   }
 
   return 1;
+}
+
+int check_list(char * source)
+{
+    
 }
 /*
   Interface:
@@ -278,11 +283,6 @@ struct pseudo_packet craft_packet(char * source, char * destination, char msg)
   iph->daddr = sin.sin_addr.s_addr;
      
   iph->check = csum ((unsigned short *) datagram, iph->tot_len);
-  
-  char temp[3];
-  temp[0] = *message
-  temp[1] = *message + 1;
-  temp[2] = *message + 2;
   
   tcph->source = msg;
   tcph->dest = htons (80);
