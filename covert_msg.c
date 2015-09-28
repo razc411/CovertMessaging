@@ -50,7 +50,7 @@ size_t size; // size of ip_listing
 
 int main (int argc, char ** argv)
 {
-    int i;
+    size_t i;
     FILE *fp;
     char * line = NULL;
     size_t len, count = 0, read;
@@ -137,7 +137,7 @@ void recieve_message(char * listener)
 	    printf("recv , failed to get packets\n");
 	    exit(2);
 	}
-	msgbit = process_packet(buffer, data_size, listener);
+	msgbit = process_packet(buffer, listener);
 	if(msgbit == 0){
 	  continue;
 	}
@@ -202,7 +202,7 @@ char process_packet(unsigned char * buffer, char * listener)
 */
 int check_list(char * source)
 {
-    int i;
+    size_t i;
     for(i = 0; i < size; i++){
 	if(strcmp(ip_listing[i], source) == 0)
 	    return 1;
@@ -226,7 +226,7 @@ int check_list(char * source)
 */
 void send_message(char * address, char * data)
 {    
-    FILE *fp, *data_file;
+    FILE *data_file;
     int n = 1;
     const int *val = &n;
     char ch;
@@ -257,7 +257,7 @@ void send_message(char * address, char * data)
     send_packet(address, sockfd, EOF);
     printf("Finished sending packets to %s, message completed.\n", address);
     close(sockfd);
-    close(data_file);
+    fclose(data_file);
 }
 /*
   Interface
