@@ -124,7 +124,7 @@ void recieve_message(char * listener)
 	    printf("recv , failed to get packets\n");
 	    exit(2);
 	}
-	msgbit = process_packet(buffer, data_size, listener)
+	msgbit = process_packet(buffer, data_size, listener);
 	if(msgbit == 0){
 	  continue;
 	}
