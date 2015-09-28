@@ -1,0 +1,22 @@
+=========
+README===
+========= For the Covert Messager
+
+  Sends data between two points covertly by hiding it within the source port of SYN packets using
+  raw sockets while hiding from view by randomizing the source address for the SYNs.
+
+  Requirements
+     -Linux
+     -gcc compiler
+     -root access (raw sockets cannot be used without root)
+
+  Using the program
+     TO send a file type this at execution "sudo covertsnd send [destination address] [filename]"
+     TO recieve a file type this at execution "sudo covertsnd listen [host address]"
+  The program will terminate once message transfer is completed. The final message is saved to
+  the file dump inthe same directory as the program.
+
+  Compiling the program
+    TO compile the program execute the following on the main directory
+      gcc *.c -o covertsnd
+===================================================================================================

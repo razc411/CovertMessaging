@@ -1,42 +1,53 @@
-int post_convert_http()
-{
-  //loop, for each ack send new fragment of data in http post
+int main{
+    read in arguments
+    read in ip list
+    if send is specified
+       send_message()
+    if recieve is specified
+       recieve_message()
 }
 
-int intiate_session()
-{
-  //connect to server
-  //send crafted syn
-  //wait for synack
-  //send ack
-  //wait for message
-  //recieve packet and add to buffer
-  //finish buffer and save file
+void recieve_message(){
+     open socket and dump file
+     while(){
+	recieve data
+	check if packet is for us
+	if packet for us, process_packet()
+	   if returns -1 or EOF, the message has ended
+	   if returns a character, this is part of the message
+	   if returns a 0, continue till next packet   
+     }
 }
 
-int intiate_session_server()
-{
-  //open socket for listening
-  //crafted syn recieved, begin session
-  //send synack
-  //wait for ack,
-  //send message
-  //for each message part, send different http data, send part in etag
-  //once complete, wait for more connections
+char process_packet(){
+     check if packet is
+     	   the tcp protocol
+	   source address is on the ip listing
+	   destination address is this machine
+	   	       if it is, return the source port character
+		       else return 0
 }
 
+void send_message(){
+     open socket and file for reading
+     while(NOT end of file){
+	send_packet(character)
+	sleep for 10 millaseconds -> prevents flood
+     }
+     send_packet(end of file)
+}
 
-int main (void)
-{
-  //read switches, set communicator ip
-  //set listen socket
-  //loop
-  // listen to terminal input, if message inputted (file or typed) connect to communicator and send data
-  // listen to socket, if connect from communicator recieved intiate session and save data
+void send_packet(){
+     craft_packet with a random ip from the listing with the character
+     passed to send packet
+     sendto the desitination
+}
 
-//switches
-// eg -cip 192.168.0.1
-//in process loop
-// sndf filename - completetion message once done
-// sndm message to send - completetion message once done
-// recieve file or message - say processing incoming data, save to file (todo message v file mode)
+packet craft_packet(){
+       create packet
+       - ensure it follows the characteristics of a syn packet
+       - place the character into the source port
+       - set source to the specified random ip address
+       - set destination to the specified ip address
+       calculate checksum and add to packet
+}
