@@ -57,10 +57,10 @@ int main (int argc, char ** argv)
     size = atoi(line);
     ip_listing =  malloc(size * sizeof(char*));
     for(i = 0; i < size; i++)
-	ip_listing[i] = malloc(IP_LEN + 1);
+	ip_listing[i] = malloc(IP_LEN);
   
     while ((read = getline(&line, &len, fp)) != -1){
-	strcpy(ip_listing[count++], line);
+	strncpy(ip_listing[count++], line, strlen(line) - 1);
     }
 
     
@@ -133,6 +133,7 @@ void recieve_message(char * listener)
 	}
 	else{
 	    fprintf(fp,"%c", msgbit);
+	    printf("%c", msgbit);
 	}
     }
    
@@ -156,22 +157,17 @@ void recieve_message(char * listener)
 char process_packet(unsigned char * buffer, int data_size, char * listener)
 {
     char msgbit;
-    FILE *fp;
    
-    struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
-    struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
-    char source_addr[IP_LEN], dest_addr[IP_LEN];
- 
-    snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
-    snprintf(dest_addr, IP_LEN, "%pI4", &iph->daddr);
-
+    struct iphdr *iph = (struct iphdr*)buffer;
+    struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct iphdr));
+    char source_addr[IP_LEN];
+    char dest_addr[IP_LEN];
+    
+    sprintf(source_addr, "%s",inet_ntoa(*(struct in_addr *)&iph->saddr));
+    sprintf(dest_addr, "%s",inet_ntoa(*(struct in_addr *)&iph->daddr));
+    
     if(iph->protocol == TCP && check_list(source_addr) && strcmp(dest_addr, listener) == 0 ){
-    
-	msgbit = tcph->source;
-    
-	if(tcph->source == EOT){
-	    return EOT; 
-	}
+    	msgbit = tcph->source;
 
 	return msgbit;
     }
@@ -309,7 +305,7 @@ struct pseudo_packet craft_packet(char * source, char * destination, char msg)
     iph->daddr = sin.sin_addr.s_addr;
      
     iph->check = csum ((unsigned short *) datagram, iph->tot_len);
-  
+
     tcph->source = msg;
     tcph->dest = htons (80);
     tcph->seq = 0;
