@@ -1,17 +1,29 @@
-#include<stdio.h> //for printf
-#include<string.h> //memset
-#include<sys/socket.h>    //for socket ofcourse
-#include<stdlib.h> //for exit(0);
-#include<errno.h> //For errno - the error number
-#include<netinet/tcp.h>   //Provides declarations for tcp header
-#include<netinet/ip.h>    //Provides declarations for ip header
-#include<unistd.h>
-#include<netdb.h>
-#include<netinet/tcp.h>
-#include<netinet/ip.h>
-#include<net/ethernet.h>
-#include<netinet/in.h>
-#include<arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <stdlib.h> 
+#include <errno.h>
+/*
+  Covert Messaging through TCP
+  by Ramzi Chennafi
+  covert_msg.h
+  
+  Functions
+    unsigned short csum(unsigned short *ptr,int nbytes) 
+
+  Header file containing definitions for covert_msg.h. Also contains the checksum function
+  for packet crafting.
+*/
+
+#include <netinet/tcp.h>   
+#include <netinet/ip.h>    
+#include <unistd.h>
+#include <netdb.h>
+#include <netinet/tcp.h>
+#include <netinet/ip.h>
+#include <net/ethernet.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 #define BUFFER_SIZE 65536
 #define TCP 6
@@ -19,9 +31,7 @@
 #define DATA_LEN 16
 #define EOT 4
 
-/* 
-    96 bit (12 bytes) pseudo header needed for tcp header checksum calculation 
-*/
+
 struct pseudo_header
 {
     u_int32_t source_address;
@@ -39,13 +49,18 @@ struct pseudo_packet
 };
 
 int check_list(char * source);
-char process_packet(unsigned char * buffer, int data_size, char * listener);
+char process_packet(unsigned char * buffer, char * listener);
 void recieve_message(char * listener);
 void send_message(char * address, char * data);
 const char * grab_random_addr();
 void send_packet(char * address, int sockfd, char c);
 struct pseudo_packet craft_packet(char * source, char * destination, char msg);
 
+/*
+  TCP Header Checksum Function
+  Grabs the checksum by taking the pseudogram and the size of the pseudogram.
+  Returns an unsigned short as a checksum.
+*/
 unsigned short csum(unsigned short *ptr,int nbytes) 
 {
     register long sum;

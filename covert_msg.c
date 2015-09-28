@@ -5,16 +5,28 @@
   
   Functions:
 
-  int process_packet(unsigned char * buffer, int data_size, char * listener);
+  int check_list(char * source);
+  char process_packet(unsigned char * buffer, char * listener);
   void recieve_message(char * listener);
   void send_message(char * address, char * data);
-  char * grab_random_addr(char ** ip_listing, int size);
+  const char * grab_random_addr();
+  void send_packet(char * address, int sockfd, char c);
   struct pseudo_packet craft_packet(char * source, char * destination, char msg);
-
+  
   Contains main code bodies for the covert messaging program.
 
-  Sends data between two points covertly by hiding it within the source port of SYN packets using raw socekts while hiding from view by
-  randomizing the source address for the SYNs.
+  Sends data between two points covertly by hiding it within the source port of SYN packets using raw socekts while 
+  hiding from view by randomizing the source address for the SYNs.
+
+  Using the program
+     TO send a file type this at execution "covertsnd send [destination address] [filename]"
+     TO recieve a file type this at execution "covertsnd listen [host address]"
+  The program will terminate once message transfer is completed. The final message is saved to the file dump in
+  the same directory as the program.
+
+  Compiling the program
+    TO compile the program execute the following on the main directory
+      gcc *.c -o covertsnd
 */
 
 #include "covert_msg.h"
@@ -29,11 +41,12 @@
   int, 0 on program end
   
   About:
-  The main body of argument. Either takes the program into sender or reciever mode.
+  The main body of argument. Either takes the program into sender or reciever mode. Also loads in the 
+  ip listings for checking later.
 */
 
-char ** ip_listing;
-size_t size;
+char ** ip_listing; // IP listing global variable
+size_t size; // size of ip_listing
 
 int main (int argc, char ** argv)
 {
@@ -136,25 +149,26 @@ void recieve_message(char * listener)
 	    printf("%c", msgbit);
 	}
     }
-   
-    printf("Message recieved from %s and completed.", listener);
+    
+    fclose(fp);
+    printf("Message recieved from %s and completed.\n", listener);
     close(sockfd);
 }
 /*
   Interface:
-    int process_packet(unsigned char * buffer, int data_size, char * listener)
+    int process_packet(unsigned char * buffer, char * listener)
   Arguments:
     unsigned char * buffer - the buffer containing the packet data
-    int data_size - the size of the buffer
     char * listener - the ip of the host
   Returns:
-    int, returns 0 when the last packet has been found and 1 when it hasn't.
+    int, returns 0 when the packet doesnt belong to the message stream, returns the character
+    from the source port if the packet is part of the stream.
 
   About:
     Processes incoming packets and retrieves each piece of data from the packets
     source port until the termination EOT packet is found.
 */
-char process_packet(unsigned char * buffer, int data_size, char * listener)
+char process_packet(unsigned char * buffer, char * listener)
 {
     char msgbit;
    
@@ -176,11 +190,9 @@ char process_packet(unsigned char * buffer, int data_size, char * listener)
 }
 /*
   Interface:
-    int check_list(char * source, char ** ip_listing, int list_size)
+    int check_list(char * source)
   Arguments:
     char * source - the source ip to check against
-    char ** ip_listing - the list of valid ips 
-    int list_size - the size of ip_listing
   Returns:
     int, 1 if the ip is in the list, 0 if it is not
 
@@ -209,7 +221,7 @@ int check_list(char * source)
 
   About:
     Sends a message a character at a time by hiding it in the source port of the tcp header.
-kk    Sends SYN floods from a list of ips in random order. Also reads in the list of IPs to be used
+    Sends SYN floods from a list of ips in random order. Also reads in the list of IPs to be used
     as false source ips.
 */
 void send_message(char * address, char * data)
@@ -243,23 +255,30 @@ void send_message(char * address, char * data)
     }
 
     send_packet(address, sockfd, EOF);
+    printf("Finished sending packets to %s, message completed.\n", address);
+    close(sockfd);
+    close(data_file);
 }
+/*
+  Interface
+    void send_packet(char* address, int sockfd, char c)
+  Arguments
+    char * address - the address to send to
+    int sockfd - the socket to send through
+    char c - the character to be sent
+  Returns 
+    nothing, void
 
+  About
+    Sends a packet to the specified address with the specified character using raw sockets.
+*/
 void send_packet(char * address, int sockfd, char c)
 {
     struct pseudo_packet pseudogram =  craft_packet(ip_listing[rand() % (size-1)], address, c);
     
     if (sendto (sockfd, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0){
 	perror("sendto failed");
-	struct in_addr ip_addr;
-	ip_addr.s_addr = pseudogram.ip_header->daddr;
-	
-	printf("IP: %s", inet_ntoa(ip_addr));
     }
-    else{
-	printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
-    }
-    
 }
 /*
   Interface:
@@ -317,7 +336,7 @@ struct pseudo_packet craft_packet(char * source, char * destination, char msg)
     tcph->psh=0;
     tcph->ack=0;
     tcph->urg=0;
-    tcph->window = htons (5840); /* maximum allowed window size */
+    tcph->window = htons (8192); 
     tcph->check = 0; 
     tcph->urg_ptr = 0;
      
