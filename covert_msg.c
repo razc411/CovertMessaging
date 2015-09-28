@@ -124,8 +124,11 @@ void recieve_message(char * listener)
 	    printf("recv , failed to get packets\n");
 	    exit(2);
 	}
-     
-	if((msgbit = process_packet(buffer, data_size, listener)) == EOT){
+	msgbit = process_packet(buffer, data_size, listener)
+	if(msgbit == 0){
+	  continue;
+	}
+	else if(msgbit == EOT){
 	    break;
 	}
 	else{
@@ -169,8 +172,11 @@ char process_packet(unsigned char * buffer, int data_size, char * listener)
 	if(tcph->source == EOT){
 	    return EOT; 
 	}
+
+	return msgbit;
     }
-    return msgbit;
+    
+    return 0;
 }
 /*
   Interface:
