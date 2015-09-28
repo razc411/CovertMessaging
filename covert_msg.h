@@ -10,6 +10,8 @@
 #include<netinet/tcp.h>
 #include<netinet/ip.h>
 #include<net/ethernet.h>
+#include<netinet/in.h>
+#include<arpa/inet.h>
 
 #define BUFFER_SIZE 65536
 #define TCP 6
@@ -36,11 +38,12 @@ struct pseudo_packet
   struct sockaddr_in * sockaddr_in;
 };
 
-int check_list(char * source, char ** ip_listing, int list_size);
-int process_packet(unsigned char * buffer, int data_size, char * listener);
+int check_list(char * source);
+char process_packet(unsigned char * buffer, int data_size, char * listener);
 void recieve_message(char * listener);
 void send_message(char * address, char * data);
-char * grab_random_addr(char ** ip_listing, int size);
+const char * grab_random_addr();
+void send_packet(char * address, int sockfd, char c);
 struct pseudo_packet craft_packet(char * source, char * destination, char msg);
 
 unsigned short csum(unsigned short *ptr,int nbytes) 

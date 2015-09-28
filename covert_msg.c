@@ -5,11 +5,11 @@
   
   Functions:
 
-    int process_packet(unsigned char * buffer, int data_size, char * listener);
-    void recieve_message(char * listener);
-    void send_message(char * address, char * data);
-    char * grab_random_addr(char ** ip_listing, int size);
-    struct pseudo_packet craft_packet(char * source, char * destination, char msg);
+  int process_packet(unsigned char * buffer, int data_size, char * listener);
+  void recieve_message(char * listener);
+  void send_message(char * address, char * data);
+  char * grab_random_addr(char ** ip_listing, int size);
+  struct pseudo_packet craft_packet(char * source, char * destination, char msg);
 
   Contains main code bodies for the covert messaging program.
 
@@ -21,77 +21,120 @@
 
 /*
   Interface:
-     int main(int argc, char ** argv)
+  int main(int argc, char ** argv)
   Arguments:
-     int argc - number of arguments
-     char ** argv - arguments
+  int argc - number of arguments
+  char ** argv - arguments
   Returns:
-     int, 0 on program end
+  int, 0 on program end
   
   About:
-     The main body of argument. Either takes the program into sender or reciever mode.
+  The main body of argument. Either takes the program into sender or reciever mode.
 */
+
+char ** ip_listing;
+size_t size;
+
 int main (int argc, char ** argv)
-{ 
-  if(argc != 2){
-      printf("Requires either a send or listen command in the form\n -listen '192.19.1.1.'\n or \n -send '192.19.1.1 'message'");
-      exit(0);
-  }
+{
+    int i;
+    FILE *fp;
+    char * line = NULL;
+    size_t len, count = 0, read;
+   
+    if(argc < 2){
+	printf("Requires either a send or listen command in the form\n -listen '192.19.1.1.'\n or \n -send '192.19.1.1 'message'");
+	exit(0);
+    }
+
+    fp = fopen("ip_listing.txt", "r");
+    if(!fp){
+	perror("Failure to open listings");
+	exit(1);
+    }
   
-  if (strcmp(argv[1], "listen")){
-    recieve_message(argv[2]);
-  }
-  else if(strcmp(argv[1], "send")){
-    send_message(argv[2], argv[3]);
-  }
-  else{
-    printf("Requires either a send or listen command in the form\n -listen\n or \n -send");
-  }
+    getline(&line, &len, fp);
+    size = atoi(line);
+    ip_listing =  malloc(size * sizeof(char*));
+    for(i = 0; i < size; i++)
+	ip_listing[i] = malloc(IP_LEN + 1);
   
-  return 0;
+    while ((read = getline(&line, &len, fp)) != -1){
+	strcpy(ip_listing[count++], line);
+    }
+
+    
+    if (strcmp(argv[1], "listen") == 0){
+	recieve_message(argv[2]);
+    }
+    else if(strcmp(argv[1], "send") == 0){
+	send_message(argv[2], argv[3]);
+    }
+    else{
+	printf("Requires either a send or listen command in the form\n -listen\n or \n -send");
+    }
+
+    for(i = 0; i < size; i++)
+	free(ip_listing[i]);
+    
+    free(ip_listing);
+    
+    return 0;
 }
 
 /*
   Interface:
-    void recieve_message(char * listener) 
+  void recieve_message(char * listener) 
   Arguments;
-    char * listener - the address of the machine
+  char * listener - the address of the machine
   Returns:
-    Nothing, void
+  Nothing, void
    
   About:
-    Sits in a loop waiting for incoming data from the sender. Returns when the message has been completely
-    sent.
+  Sits in a loop waiting for incoming data from the sender. Returns when the message has been completely
+  sent.
 */ 
 void recieve_message(char * listener) 
 {
     int serv_size , data_size, sockfd;
-   struct sockaddr serv_addr;
-   unsigned char *buffer = (unsigned char *) malloc(BUFFER_SIZE);
+    struct sockaddr serv_addr;
+    FILE *fp;
+    unsigned char *buffer = (unsigned char *) malloc(BUFFER_SIZE);
+    char msgbit;
+
+    sockfd = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
    
-   sockfd = socket(AF_INET , SOCK_RAW , IPPROTO_TCP);
-   
-   if (sockfd < 0){
-     perror("ERROR opening socket");
-     exit(1);
-   }
-   
-   while(1){
+    if (sockfd < 0){
+	perror("ERROR opening socket");
+	exit(1);
+    }
+
+    fp = fopen("dump", "w");
+    if(!fp){
+	perror("Failed to open file");
+	exit(1);
+    }
+  
+    while(1){
      
-     serv_size = sizeof(serv_addr);
-     data_size = recvfrom(sockfd, buffer , BUFFER_SIZE, 0, &serv_addr, (socklen_t*)&serv_size);
+	serv_size = sizeof(serv_addr);
+	data_size = recvfrom(sockfd, buffer , BUFFER_SIZE, 0, &serv_addr, (socklen_t*)&serv_size);
      
-     if(data_size < 0){
-       printf("recv , failed to get packets\n");
-       exit(2);
-     }
+	if(data_size < 0){
+	    printf("recv , failed to get packets\n");
+	    exit(2);
+	}
      
-     if(!process_packet(buffer, data_size, listener))
-       break;
-   }
+	if((msgbit = process_packet(buffer, data_size, listener)) == EOT){
+	    break;
+	}
+	else{
+	    fprintf(fp,"%c", msgbit);
+	}
+    }
    
-   printf("Message recieved from %s and completed.", listener);
-   close(sockfd);
+    printf("Message recieved from %s and completed.", listener);
+    close(sockfd);
 }
 /*
   Interface:
@@ -107,50 +150,27 @@ void recieve_message(char * listener)
     Processes incoming packets and retrieves each piece of data from the packets
     source port until the termination EOT packet is found.
 */
-int process_packet(unsigned char * buffer, int data_size, char * listener)
+char process_packet(unsigned char * buffer, int data_size, char * listener)
 {
-  char msgbit;
-  FILE *fp;
-  fp = fopen("dump", "w");
-  if(!fp){
-    perror("Failed to open file");
-    exit(1);
-  }
-  
-  fp = fopen("ip_listing.txt", "r");
-  if(!fp){
-    perror("Failure to open listings");
-    exit(1);
-  }
-  
-  getline(&line, &len, fp);
-  int size = atoi(line);
-  char ip_listing[size][IP_LEN];
-  
-  while ((read = getline(&line, &len, fp)) != -1){
-     ip_listing[count++] == line;
-  }
-
-  struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
-  struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
-  char source_addr[IP_LEN], dest_addr[IP_LEN];
+    char msgbit;
+    FILE *fp;
+   
+    struct iphdr *iph = (struct iphdr*)(buffer + sizeof(struct ethhdr));
+    struct tcphdr * tcph = (struct tcphdr*)(buffer + sizeof(struct ethhdr) + sizeof(struct iphdr));
+    char source_addr[IP_LEN], dest_addr[IP_LEN];
  
-  snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
-  snprintf(dest_addr, IP_LEN, "%pI4", &iph->daddr);
+    snprintf(source_addr, IP_LEN, "%pI4", &iph->saddr);
+    snprintf(dest_addr, IP_LEN, "%pI4", &iph->daddr);
 
-  if(iph->protocol == TCP && check_list(source_addr, ip_listing, size) && strcmp(dest_addr, listener) == 0 ){
+    if(iph->protocol == TCP && check_list(source_addr) && strcmp(dest_addr, listener) == 0 ){
     
-    msgbit = tcph->source;
-
-    if(tcph->source == EOT){
-      return 0;
-      close(fp);
+	msgbit = tcph->source;
+    
+	if(tcph->source == EOT){
+	    return EOT; 
+	}
     }
-    
-    fprintf(fp,"%c", msgbit);
-  }
-
-  return 1;
+    return msgbit;
 }
 /*
   Interface:
@@ -166,14 +186,15 @@ int process_packet(unsigned char * buffer, int data_size, char * listener)
     Checks if the source ip of the packet matches one on the list and returns the 
     corresponding int.
 */
-int check_list(char * source, char ** ip_listing, int list_size)
+int check_list(char * source)
 {
-  for(int i = 0; i < list_size; i++){
-    if(strcmp(ip_listing[i], source) == 0)
-      return 1;
-  }
+    int i;
+    for(i = 0; i < size; i++){
+	if(strcmp(ip_listing[i], source) == 0)
+	    return 1;
+    }
 
-  return 0;
+    return 0;
 }
 /*
   Interface:
@@ -186,87 +207,58 @@ int check_list(char * source, char ** ip_listing, int list_size)
 
   About:
     Sends a message a character at a time by hiding it in the source port of the tcp header.
-    Sends SYN floods from a list of ips in random order. Also reads in the list of IPs to be used
+kk    Sends SYN floods from a list of ips in random order. Also reads in the list of IPs to be used
     as false source ips.
 */
 void send_message(char * address, char * data)
 {    
-  FILE *fp, *data_file;
-  int n = 1, count = 1;
-  const int *val = &n;
-  char * line = NULL;
-  size_t len = 0, read;
-  char ch;
+    FILE *fp, *data_file;
+    int n = 1;
+    const int *val = &n;
+    char ch;
 
-  fp = fopen("ip_listing.txt", "r");
-  if(!fp){
-    perror("Failure to open listings");
-    exit(1);
-  }
-
-  data_file = fopen(data, "r");
-  if(!data_file){
-    perror("Failure to open data file.");
-    exit(1);
-  }
+    data_file = fopen(data, "r");
+    if(!data_file){
+	perror("Failure to open data file.");
+	exit(1);
+    }
   
-  getline(&line, &len, fp);
-  int size = atoi(line);
-  char ip_listing[size][IP_LEN];
-  
-  while ((read = getline(&line, &len, fp)) != -1){
-     ip_listing[count++] == line;
-  }
-  
-  int sockfd = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
+    int sockfd = socket (PF_INET, SOCK_RAW, IPPROTO_TCP);
      
-  if(sockfd == -1){
-      perror("Failed to create socket");
-      exit(1);
-  }
+    if(sockfd == -1){
+	perror("Failed to create socket");
+	exit(1);
+    }
 
-  if (setsockopt (sockfd, IPPROTO_IP, IP_HDRINCL, val, sizeof (n)) < 0){
-      perror("Error setting IP_HDRINCL");
-      exit(0);
-  }
+    if (setsockopt (sockfd, IPPROTO_IP, IP_HDRINCL, val, sizeof (n)) < 0){
+	perror("Error setting IP_HDRINCL");
+	exit(0);
+    }
      
-  while ((ch=fgetc(data_file)) !=EOF){
-    struct pseudo_packet pseudogram =  craft_packet(address, grab_random_addr(ip_listing, size), ch);
+    while ((ch=fgetc(data_file)) !=EOF){
+	send_packet(address, sockfd, ch);
+	usleep(100000);
+    }
+
+    send_packet(address, sockfd, EOF);
+}
+
+void send_packet(char * address, int sockfd, char c)
+{
+    struct pseudo_packet pseudogram =  craft_packet(ip_listing[rand() % (size-1)], address, c);
     
     if (sendto (sockfd, pseudogram.datagram, pseudogram.ip_header->tot_len ,  0, (struct sockaddr *) pseudogram.sockaddr_in, sizeof (*pseudogram.sockaddr_in)) < 0){
-      perror("sendto failed");
+	perror("sendto failed");
+	struct in_addr ip_addr;
+	ip_addr.s_addr = pseudogram.ip_header->daddr;
+	
+	printf("IP: %s", inet_ntoa(ip_addr));
     }
     else{
-      printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
+	printf ("Packet Send. Length : %d \n" , pseudogram.ip_header->tot_len);
     }
     
-    usleep(10000);
-  }
-     
-  return 0;
 }
-
-/*
-  Interface 
-    char * grab_random_addr(char ** ip_listing, int size)
-  Arguments:
-    char ** ip_listing - the list of ips to choose
-    int size - the size of the ip list
-  Returns:
-    char *, the IP that was chosen.
-
-  About:
-    Grabs a random ip address from the IP listing array and returns it.
-*/
-char * grab_random_addr(char ** ip_listing, int size)
-{
-  int n;
-  time_t t;
-  srand((unsigned) time(&t));
-  
-  return ip_listing[rand() % size];
-}
-
 /*
   Interface:
     struct pseudo_packet craft_packet(char * source, char * destination, char msg)
@@ -283,68 +275,68 @@ char * grab_random_addr(char ** ip_listing, int size)
 */
 struct pseudo_packet craft_packet(char * source, char * destination, char msg)
 {
-  char datagram[4096] , source_ip[32] , *data , *pseudogram;
+    char datagram[4096] , source_ip[32] , *data , *pseudogram;
      
-  struct iphdr *iph = (struct iphdr *) datagram;
-  struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct ip));
-  struct sockaddr_in sin;
-  struct pseudo_header psh;
+    struct iphdr *iph = (struct iphdr *) datagram;
+    struct tcphdr *tcph = (struct tcphdr *) (datagram + sizeof (struct ip));
+    struct sockaddr_in sin;
+    struct pseudo_header psh;
      
-  data = datagram + sizeof(struct iphdr) + sizeof(struct tcphdr);
-  strcpy(data, "");
+    data = datagram + sizeof(struct iphdr) + sizeof(struct tcphdr);
+    strcpy(data, "");
 
-  strcpy(source_ip , source);
-  sin.sin_family = AF_INET;
-  sin.sin_port = htons(80);
-  sin.sin_addr.s_addr = inet_addr (destination);
+    strcpy(source_ip , source);
+    sin.sin_family = AF_INET;
+    sin.sin_port = htons(80);
+    sin.sin_addr.s_addr = inet_addr (destination);
      
-  iph->ihl = 5;
-  iph->version = 4;
-  iph->tos = 0;
-  iph->tot_len = sizeof (struct iphdr) + sizeof (struct tcphdr) + strlen(data);
-  iph->id = 0; 
-  iph->frag_off = 0;
-  iph->ttl = 255;
-  iph->protocol = IPPROTO_TCP;
-  iph->check = 0;     
-  iph->saddr = inet_addr (source);    
-  iph->daddr = sin.sin_addr.s_addr;
+    iph->ihl = 5;
+    iph->version = 4;
+    iph->tos = 0;
+    iph->tot_len = sizeof (struct iphdr) + sizeof (struct tcphdr) + strlen(data);
+    iph->id = 0; 
+    iph->frag_off = 0;
+    iph->ttl = 255;
+    iph->protocol = IPPROTO_TCP;
+    iph->check = 0;     
+    iph->saddr = inet_addr (source);    
+    iph->daddr = sin.sin_addr.s_addr;
      
-  iph->check = csum ((unsigned short *) datagram, iph->tot_len);
+    iph->check = csum ((unsigned short *) datagram, iph->tot_len);
   
-  tcph->source = msg;
-  tcph->dest = htons (80);
-  tcph->seq = 0;
-  tcph->ack_seq = 0;
-  tcph->doff = 5;  //tcp header size
-  tcph->fin=0;
-  tcph->syn=1;
-  tcph->rst=0;
-  tcph->psh=0;
-  tcph->ack=0;
-  tcph->urg=0;
-  tcph->window = htons (5840); /* maximum allowed window size */
-  tcph->check = 0; 
-  tcph->urg_ptr = 0;
+    tcph->source = msg;
+    tcph->dest = htons (80);
+    tcph->seq = 0;
+    tcph->ack_seq = 0;
+    tcph->doff = 5;  //tcp header size
+    tcph->fin=0;
+    tcph->syn=1;
+    tcph->rst=0;
+    tcph->psh=0;
+    tcph->ack=0;
+    tcph->urg=0;
+    tcph->window = htons (5840); /* maximum allowed window size */
+    tcph->check = 0; 
+    tcph->urg_ptr = 0;
      
-  psh.source_address = inet_addr(source);
-  psh.dest_address = sin.sin_addr.s_addr;
-  psh.placeholder = 0;
-  psh.protocol = IPPROTO_TCP;
-  psh.tcp_length = htons(sizeof(struct tcphdr) + strlen(data) );
+    psh.source_address = inet_addr(source);
+    psh.dest_address = sin.sin_addr.s_addr;
+    psh.placeholder = 0;
+    psh.protocol = IPPROTO_TCP;
+    psh.tcp_length = htons(sizeof(struct tcphdr) + strlen(data) );
      
-  int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + strlen(data);
-  pseudogram = malloc(psize);
+    int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + strlen(data);
+    pseudogram = malloc(psize);
      
-  memcpy(pseudogram , (char*) &psh , sizeof (struct pseudo_header));
-  memcpy(pseudogram + sizeof(struct pseudo_header) , tcph , sizeof(struct tcphdr) + strlen(data));
+    memcpy(pseudogram , (char*) &psh , sizeof (struct pseudo_header));
+    memcpy(pseudogram + sizeof(struct pseudo_header) , tcph , sizeof(struct tcphdr) + strlen(data));
      
-  tcph->check = csum( (unsigned short*) pseudogram , psize);
+    tcph->check = csum( (unsigned short*) pseudogram , psize);
 
-  struct pseudo_packet packet_package;
-  packet_package.datagram = &datagram;
-  packet_package.ip_header = iph;
-  packet_package.sockaddr_in = &sin;
+    struct pseudo_packet packet_package;
+    packet_package.datagram = &datagram;
+    packet_package.ip_header = iph;
+    packet_package.sockaddr_in = &sin;
     
-  return packet_package;
+    return packet_package;
 }
