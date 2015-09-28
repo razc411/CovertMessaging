@@ -128,11 +128,11 @@ void recieve_message(char * listener)
 	if(msgbit == 0){
 	  continue;
 	}
-	else if(msgbit == EOT){
+	else if(msgbit == EOT || msgbit == -1){
 	    break;
 	}
 	else{
-	    fprintf(fp,"%c", msgbit);
+	    fputc(msgbit, fp);
 	    printf("%c", msgbit);
 	}
     }
